@@ -36,6 +36,7 @@ if (!COLORS.includes(color)) {
 
 const slug = title
   .toLowerCase()
+  .replace(/đ/g, 'd') // Vietnamese đ has no decomposed form, so NFKD alone would drop it
   .normalize('NFKD')
   .replace(/[̀-ͯ]/g, '')
   .replace(/[^a-z0-9]+/g, '-')
