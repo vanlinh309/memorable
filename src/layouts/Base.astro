@@ -1,0 +1,50 @@
+---
+import '@fontsource-variable/fredoka';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Absolute URL, or a path relative to the site root. */
+  image?: string;
+}
+
+const {
+  title = 'Team memories',
+  description = 'Our team events, one adventure at a time.',
+  image = '/og-default.png',
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const imageUrl = new URL(image, Astro.site);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#FFF6E3" />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Memories" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Team memories" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={imageUrl} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>{title}</title>
+    <script is:inline>
+      document.documentElement.classList.add('js');
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

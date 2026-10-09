@@ -1,0 +1,250 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  events: CollectionEntry<'events'>[];
+}
+
+const { events } = Astro.props;
+
+const W = 320;
+const ROW = 110;
+const TOP = 50;
+const X_LEFT = 100;
+const X_RIGHT = 220;
+const X_MID = W / 2;
+
+type Stop =
+  | { kind: 'year'; year: number; x: number; y: number }
+  | { kind: 'event'; event: CollectionEntry<'events'>; side: 'left' | 'right'; x: number; y: number };
+
+const sorted = [...events].sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const stops: Stop[] = [];
+let lastYear: number | null = null;
+let eventIndex = 0;
+for (const event of sorted) {
+  const year = event.data.date.getUTCFullYear();
+  if (year !== lastYear) {
+    stops.push({ kind: 'year', year, x: X_MID, y: TOP + stops.length * ROW });
+    lastYear = year;
+  }
+  const side = eventIndex % 2 === 0 ? 'right' : 'left';
+  stops.push({
+    kind: 'event',
+    event,
+    side,
+    x: side === 'right' ? X_RIGHT : X_LEFT,
+    y: TOP + stops.length * ROW,
+  });
+  eventIndex++;
+}
+
+const H = TOP * 2 + Math.max(stops.length - 1, 0) * ROW;
+
+const path = stops
+  .map((s, i) => {
+    if (i === 0) return `M${s.x} ${s.y}`;
+    const p = stops[i - 1];
+    const mid = (p.y + s.y) / 2;
+    return `C${p.x} ${mid} ${s.x} ${mid} ${s.x} ${s.y}`;
+  })
+  .join(' ');
+
+const pct = (value: number, total: number) => `${(value / total) * 100}%`;
+
+const formatDate = (d: Date) =>
+  d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+---
+
+<div class="map" style={`aspect-ratio: ${W} / ${H}`}>
+  <svg viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+    <path d={path} class="road" />
+    <path d={path} class="dashes" />
+  </svg>
+
+  {
+    stops.map((s, i) =>
+      s.kind === 'year' ? (
+        <div class="year reveal" id={`y${s.year}`} style={`left:${pct(s.x, W)};top:${pct(s.y, H)}`}>
+          {s.year}
+        </div>
+      ) : (
+        <a
+          class={`stop reveal ${s.side}`}
+          data-color={s.event.data.color}
+          href={`/events/${s.event.id}/`}
+          style={`left:${pct(s.x, W)};top:${pct(s.y, H)};--i:${i}`}
+        >
+          <span class="node" aria-hidden="true">{s.event.data.icon}</span>
+          <span class="label">
+            <b>{s.event.data.title}</b>
+            <span>{formatDate(s.event.data.date)}</span>
+          </span>
+        </a>
+      ),
+    )
+  }
+</div>
+
+<script>
+  const items = document.querySelectorAll<HTMLElement>('.reveal');
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          io.unobserve(entry.target);
+        }
+      }
+    },
+    { threshold: 0.3 },
+  );
+  items.forEach((el) => io.observe(el));
+</script>
+
+<style>
+  .map {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .road,
+  .dashes {
+    fill: none;
+    stroke-linecap: round;
+  }
+
+  .road {
+    stroke: #fff;
+    stroke-width: 18;
+  }
+
+  .dashes {
+    stroke: #ffb84d;
+    stroke-width: 5;
+    stroke-dasharray: 2 12;
+  }
+
+  .year,
+  .stop {
+    position: absolute;
+    transform: translate(-50%, -50%);
+  }
+
+  .year {
+    background: var(--purple);
+    color: #fff;
+    font-weight: 600;
+    font-size: 1.15rem;
+    padding: 0.2rem 1rem;
+    border-radius: 99px;
+    border: 4px solid #fff;
+    box-shadow: 0 4px 0 rgba(43, 35, 80, 0.25);
+  }
+
+  .stop {
+    display: block;
+    width: 64px;
+    height: 64px;
+    text-decoration: none;
+    color: inherit;
+    --c: var(--purple);
+  }
+
+  .stop[data-color='red'] { --c: var(--red); }
+  .stop[data-color='purple'] { --c: var(--purple); }
+  .stop[data-color='teal'] { --c: var(--teal); }
+  .stop[data-color='amber'] { --c: var(--amber); }
+  .stop[data-color='pink'] { --c: var(--pink); }
+  .stop[data-color='blue'] { --c: var(--blue); }
+
+  .node {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    font-size: 1.8rem;
+    border-radius: 50%;
+    background: var(--c);
+    border: 4px solid #fff;
+    box-shadow: 0 5px 0 rgba(43, 35, 80, 0.25);
+    animation: bob 2.4s ease-in-out infinite;
+    animation-delay: calc(var(--i) * -0.4s);
+    transition: transform 0.15s;
+  }
+
+  .stop:active .node {
+    transform: scale(0.9);
+    animation-play-state: paused;
+  }
+
+  .label {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6.5rem;
+    line-height: 1.2;
+  }
+
+  .right .label {
+    right: calc(100% + 8px);
+    text-align: right;
+  }
+
+  .left .label {
+    left: calc(100% + 8px);
+    text-align: left;
+  }
+
+  .label b {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .label span {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  :global(.js) .reveal {
+    opacity: 0;
+    transition:
+      opacity 0.5s ease,
+      translate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    translate: 0 24px;
+  }
+
+  :global(.js) .reveal.in {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  @media (hover: hover) {
+    .stop:hover .node {
+      transform: scale(1.08) rotate(-4deg);
+    }
+  }
+</style>

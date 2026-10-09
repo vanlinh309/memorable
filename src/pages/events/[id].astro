@@ -1,0 +1,305 @@
+---
+import { getImage } from 'astro:assets';
+import { getCollection, render } from 'astro:content';
+import type { ImageMetadata } from 'astro';
+import sharp from 'sharp';
+import { join } from 'node:path';
+import Base from '../../layouts/Base.astro';
+
+const THUMB_SIZES = '(min-width: 480px) 150px, 30vw';
+
+export async function getStaticPaths() {
+  const events = await getCollection('events');
+  return events.map((event) => ({ params: { id: event.id }, props: { event } }));
+}
+
+const { event } = Astro.props;
+const { Content } = await render(event);
+
+const photoModules = import.meta.glob<{ default: ImageMetadata }>(
+  '/src/content/events/*/photos/*.{jpg,jpeg,png,webp}',
+  { eager: true },
+);
+const videoUrls = import.meta.glob<string>('/src/content/events/*/*.{mp4,webm,mov}', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+
+const photoPrefix = `/src/content/events/${event.id}/photos/`;
+const photos = await Promise.all(
+  Object.entries(photoModules)
+    .filter(([path]) => path.startsWith(photoPrefix))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(async ([path, mod]) => {
+      const src = mod.default;
+      const thumb = await getImage({
+        src,
+        width: 240,
+        height: 240,
+        fit: 'cover',
+        format: 'webp',
+        widths: [240, 360, 480],
+        sizes: THUMB_SIZES,
+      });
+      const full = await getImage({ src, width: Math.min(src.width, 1800), format: 'webp' });
+      const tiny = await sharp(join(process.cwd(), path))
+        .resize(16, 16, { fit: 'cover' })
+        .jpeg({ quality: 40 })
+        .toBuffer();
+      return { src, thumb, full, blur: `data:image/jpeg;base64,${tiny.toString('base64')}` };
+    }),
+);
+
+const videoPrefix = `/src/content/events/${event.id}/`;
+const videos = Object.entries(videoUrls)
+  .filter(([path]) => path.startsWith(videoPrefix))
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([, url]) => url);
+
+const { title, date, color, icon, tags, slack } = event.data;
+const dateLabel = date.toLocaleDateString('en-GB', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+const ogSource = event.data.cover ?? photos[0]?.src;
+const ogImage = ogSource
+  ? await getImage({ src: ogSource, width: 1200, height: 630, fit: 'cover', format: 'jpeg' })
+  : undefined;
+const description =
+  event.body?.replace(/[#*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160) || dateLabel;
+---
+
+<Base title={`${title} · Team memories`} description={description} image={ogImage?.src}>
+  <article data-color={color}>
+    <header class="cover">
+      <a class="back" href="/" aria-label="Back to the map">←</a>
+      <button class="burst" type="button" aria-label="Celebrate" id="burst">{icon}</button>
+      <p class="date">{dateLabel}</p>
+      <h1>{title}</h1>
+    </header>
+
+    <div class="body">
+      <p class="tags">
+        {tags.map((tag) => <span class="tag">{tag}</span>)}
+        {photos.length > 0 && <span class="tag">{photos.length} {photos.length === 1 ? 'photo' : 'photos'}</span>}
+      </p>
+
+      <div class="prose"><Content /></div>
+
+      {
+        photos.length > 0 && (
+          <div class="grid" id="gallery">
+            {photos.map(({ thumb, full, blur }, i) => (
+              <a
+                href={full.src}
+                data-pswp-width={full.attributes.width}
+                data-pswp-height={full.attributes.height}
+                style={`--r:${i % 2 === 0 ? -2 : 2}deg;background-image:url(${blur})`}
+              >
+                <img
+                  src={thumb.src}
+                  srcset={thumb.srcSet.attribute}
+                  sizes={THUMB_SIZES}
+                  width={thumb.attributes.width}
+                  height={thumb.attributes.height}
+                  alt=""
+                  loading={i < 6 ? 'eager' : 'lazy'}
+                  decoding="async"
+                />
+              </a>
+            ))}
+          </div>
+        )
+      }
+
+      {
+        videos.map((url) => (
+          <video class="clip" src={url} controls playsinline muted preload="metadata" />
+        ))
+      }
+
+      {
+        slack && (
+          <a class="slack" href={slack} target="_blank" rel="noopener noreferrer">
+            See the original Slack post →
+          </a>
+        )
+      }
+    </div>
+  </article>
+</Base>
+
+<script>
+  import PhotoSwipeLightbox from 'photoswipe/lightbox';
+  import 'photoswipe/style.css';
+  import confetti from 'canvas-confetti';
+
+  const lightbox = new PhotoSwipeLightbox({
+    gallery: '#gallery',
+    children: 'a',
+    pswpModule: () => import('photoswipe'),
+  });
+  lightbox.init();
+
+  const colors = ['#ff5c5c', '#ffd23f', '#17b8a6', '#7b5cff', '#ff5c8a', '#ffa927'];
+  const celebrate = () =>
+    confetti({
+      particleCount: 90,
+      spread: 80,
+      startVelocity: 45,
+      origin: { y: 0.3 },
+      colors,
+      disableForReducedMotion: true,
+    });
+
+  celebrate();
+  document.getElementById('burst')?.addEventListener('click', celebrate);
+</script>
+
+<style>
+  article {
+    --c: var(--purple);
+    max-width: 480px;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+  }
+
+  article[data-color='red'] { --c: var(--red); }
+  article[data-color='purple'] { --c: var(--purple); }
+  article[data-color='teal'] { --c: var(--teal); }
+  article[data-color='amber'] { --c: var(--amber); }
+  article[data-color='pink'] { --c: var(--pink); }
+  article[data-color='blue'] { --c: var(--blue); }
+
+  .cover {
+    position: relative;
+    background: var(--c);
+    color: #fff;
+    padding: 4.5rem 1.25rem 1.5rem;
+    border-radius: 0 0 32px 32px;
+  }
+
+  .back {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--ink);
+    font-size: 1.4rem;
+    text-decoration: none;
+    box-shadow: 0 3px 0 rgba(43, 35, 80, 0.25);
+  }
+
+  .burst {
+    position: absolute;
+    top: 0.75rem;
+    right: 1rem;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border: 4px solid #fff;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    font-size: 1.7rem;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  .burst:active {
+    transform: scale(0.88) rotate(-8deg);
+  }
+
+  .date {
+    margin: 0;
+    font-weight: 500;
+    opacity: 0.95;
+  }
+
+  h1 {
+    margin: 0.15rem 0 0;
+    font-size: 2rem;
+    line-height: 1.1;
+    font-weight: 600;
+  }
+
+  .body {
+    padding: 1.25rem 1.25rem 0;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .tag {
+    padding: 0.1rem 0.75rem;
+    border: 2px solid var(--ink);
+    border-radius: 99px;
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .prose {
+    color: #4a4272;
+    line-height: 1.5;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .grid a {
+    display: block;
+    overflow: hidden;
+    border-radius: 16px;
+    background-color: #fff;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.15s;
+  }
+
+  .grid img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
+  @media (hover: hover) {
+    .grid a:hover {
+      transform: rotate(var(--r)) scale(1.05);
+    }
+  }
+
+  .clip {
+    display: block;
+    width: 100%;
+    margin-top: 0.75rem;
+    border-radius: 16px;
+    background: var(--ink);
+  }
+
+  .slack {
+    display: inline-block;
+    margin-top: 1.25rem;
+    color: var(--purple);
+    font-weight: 500;
+    text-decoration: none;
+  }
+</style>

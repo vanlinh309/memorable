@@ -1,0 +1,48 @@
+---
+import { getCollection } from 'astro:content';
+import AdventureMap from '../components/AdventureMap.astro';
+import BottomBar from '../components/BottomBar.astro';
+import OnThisDay from '../components/OnThisDay.astro';
+import Base from '../layouts/Base.astro';
+
+const events = await getCollection('events');
+
+const eventsData = events.map((e) => ({
+  id: e.id,
+  title: e.data.title,
+  icon: e.data.icon,
+  date: e.data.date.toISOString().slice(0, 10),
+  tags: e.data.tags,
+  text: (e.body ?? '').replace(/\s+/g, ' ').trim(),
+}));
+---
+
+<Base>
+  <header>
+    <h1>Team memories</h1>
+  </header>
+  <OnThisDay />
+  <main>
+    <AdventureMap events={events} />
+  </main>
+  <BottomBar />
+  <script type="application/json" id="events-data" set:html={JSON.stringify(eventsData).replace(/</g, '\\u003c')} />
+</Base>
+
+<style>
+  header {
+    padding: 1.25rem 1.25rem 0.5rem;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 600;
+  }
+
+  main {
+    padding: 0 0.75rem 7rem;
+  }
+</style>

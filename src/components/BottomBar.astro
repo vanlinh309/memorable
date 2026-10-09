@@ -1,0 +1,289 @@
+---
+---
+
+<nav class="bar" aria-label="Quick actions">
+  <button type="button" id="open-years"><span aria-hidden="true">📅</span>Year</button>
+  <button type="button" id="random" class="mid" aria-label="Random memory"><span aria-hidden="true">🎲</span></button>
+  <button type="button" id="open-search"><span aria-hidden="true">🔍</span>Search</button>
+</nav>
+
+<dialog id="years-dialog" aria-label="Jump to a year">
+  <form method="dialog" class="sheet-head">
+    <h2>Jump to a year</h2>
+    <button aria-label="Close">✕</button>
+  </form>
+  <div id="years-list" class="years"></div>
+</dialog>
+
+<dialog id="search-dialog" aria-label="Search memories">
+  <form method="dialog" class="sheet-head">
+    <h2>Search memories</h2>
+    <button aria-label="Close">✕</button>
+  </form>
+  <input id="search-input" type="search" placeholder="Try “party” or “2025”" autocomplete="off" />
+  <ul id="search-results" class="results"></ul>
+</dialog>
+
+<script>
+  interface EventData {
+    id: string;
+    title: string;
+    icon: string;
+    date: string;
+    tags: string[];
+    text: string;
+  }
+
+  const events: EventData[] = JSON.parse(document.getElementById('events-data')?.textContent ?? '[]');
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const yearsDialog = document.getElementById('years-dialog') as HTMLDialogElement;
+  const searchDialog = document.getElementById('search-dialog') as HTMLDialogElement;
+  const input = document.getElementById('search-input') as HTMLInputElement;
+  const results = document.getElementById('search-results') as HTMLUListElement;
+
+  // Dialogs close on a tap outside the sheet.
+  for (const dialog of [yearsDialog, searchDialog]) {
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+  }
+
+  document.getElementById('random')?.addEventListener('click', () => {
+    if (events.length === 0) return;
+    const pick = events[Math.floor(Math.random() * events.length)];
+    location.href = `/events/${pick.id}/`;
+  });
+
+  const counts = new Map<string, number>();
+  for (const e of events) {
+    const year = e.date.slice(0, 4);
+    counts.set(year, (counts.get(year) ?? 0) + 1);
+  }
+  const yearsList = document.getElementById('years-list') as HTMLElement;
+  for (const [year, count] of [...counts].sort((a, b) => Number(b[0]) - Number(a[0]))) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.innerHTML = `<b>${year}</b><span>${count} ${count === 1 ? 'event' : 'events'}</span>`;
+    button.addEventListener('click', () => {
+      yearsDialog.close();
+      document
+        .getElementById(`y${year}`)
+        ?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'center' });
+    });
+    yearsList.append(button);
+  }
+  document.getElementById('open-years')?.addEventListener('click', () => yearsDialog.showModal());
+
+  const render = () => {
+    const query = input.value.trim().toLowerCase();
+    const matches = query
+      ? events.filter((e) =>
+          [e.title, e.date, e.text, ...e.tags].some((field) => field.toLowerCase().includes(query)),
+        )
+      : events;
+    results.replaceChildren();
+    if (matches.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'No memories found. Try another word.';
+      results.append(li);
+      return;
+    }
+    for (const e of matches) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = `/events/${e.id}/`;
+      const icon = document.createElement('span');
+      icon.textContent = e.icon;
+      icon.setAttribute('aria-hidden', 'true');
+      const text = document.createElement('div');
+      const title = document.createElement('b');
+      title.textContent = e.title;
+      const date = document.createElement('small');
+      date.textContent = formatDate(e.date);
+      text.append(title, date);
+      a.append(icon, text);
+      li.append(a);
+      results.append(li);
+    }
+  };
+  input.addEventListener('input', render);
+  document.getElementById('open-search')?.addEventListener('click', () => {
+    searchDialog.showModal();
+    render();
+    input.focus();
+  });
+</script>
+
+<style>
+  .bar {
+    position: fixed;
+    left: 50%;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: min(340px, calc(100% - 28px));
+    height: 62px;
+    border-radius: 24px;
+    background: var(--ink);
+  }
+
+  .bar button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 4px 14px;
+    border: 0;
+    background: none;
+    color: #fff;
+    font: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .bar button span {
+    font-size: 1.35rem;
+    line-height: 1.2;
+  }
+
+  .bar .mid {
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    margin-top: -22px;
+    padding: 0;
+    border: 4px solid var(--cream);
+    border-radius: 50%;
+    background: var(--pink);
+    box-shadow: 0 4px 0 rgba(43, 35, 80, 0.3);
+    transition: transform 0.15s;
+  }
+
+  .bar .mid:active {
+    transform: scale(0.9) rotate(20deg);
+  }
+
+  dialog {
+    width: 100%;
+    max-width: 480px;
+    max-height: 80dvh;
+    margin: auto auto 0;
+    padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 28px 28px 0 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: inherit;
+  }
+
+  dialog::backdrop {
+    background: rgba(43, 35, 80, 0.55);
+  }
+
+  .sheet-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .sheet-head button {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .years {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+
+  .years :global(button) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.8rem 0.5rem;
+    border: 4px solid #fff;
+    border-radius: 20px;
+    background: var(--purple);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 0 rgba(43, 35, 80, 0.25);
+  }
+
+  .years :global(b) {
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+
+  .years :global(span) {
+    font-size: 0.8rem;
+    opacity: 0.9;
+  }
+
+  input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 3px solid var(--ink);
+    border-radius: 99px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-size: 1rem;
+  }
+
+  .results {
+    margin: 0.75rem 0 0;
+    padding: 0;
+    max-height: 45dvh;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .results :global(a) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.25rem;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .results :global(a span) {
+    font-size: 1.6rem;
+  }
+
+  .results :global(b) {
+    display: block;
+    font-weight: 600;
+  }
+
+  .results :global(small) {
+    color: var(--ink-soft);
+  }
+
+  .results :global(.empty) {
+    padding: 1rem 0.25rem;
+    color: var(--ink-soft);
+  }
+</style>

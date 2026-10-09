@@ -1,0 +1,49 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Lost in the map · Team memories">
+  <main>
+    <p class="emoji" aria-hidden="true">🧭</p>
+    <h1>This path doesn't lead anywhere</h1>
+    <p>The memory you're looking for isn't on the map.</p>
+    <a href="/">Back to the map</a>
+  </main>
+</Base>
+
+<style>
+  main {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 20vh 1.5rem 2rem;
+    text-align: center;
+  }
+
+  .emoji {
+    margin: 0;
+    font-size: 4rem;
+  }
+
+  h1 {
+    margin: 0.5rem 0;
+    font-size: 1.6rem;
+    font-weight: 600;
+  }
+
+  p {
+    color: var(--ink-soft);
+  }
+
+  a {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.7rem 1.5rem;
+    border: 4px solid #fff;
+    border-radius: 99px;
+    background: var(--purple);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 4px 0 rgba(43, 35, 80, 0.25);
+  }
+</style>
