@@ -1,0 +1,10 @@
+// Cloudflare Workers config: the site is fully static, so this only uploads ./dist.
+// Without this file, `wrangler deploy` auto-configures an SSR adapter, which breaks the build.
+{
+  "name": "memorable",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}
