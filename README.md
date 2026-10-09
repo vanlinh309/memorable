@@ -40,13 +40,14 @@ Photos are resized and converted to WebP at build time, with blurred placeholder
 - Installable on a phone's home screen
 - Link previews in Slack show the event's cover photo
 
-## Deploy to Cloudflare Pages
+## Deployment
 
-1. Push this repo to GitHub.
-2. In Cloudflare, go to Workers & Pages, then Create, then Pages, then Connect to Git, and pick the repo.
-3. Build settings: build command `npm run build`, output directory `dist`.
-4. Environment variables: `NODE_VERSION` = `22`, and `SITE_URL` = the final address, for example `https://your-name.pages.dev` (used for link previews).
-5. Every push to `main` redeploys the site.
+Live at https://memorable.linh309.workers.dev, hosted as a Cloudflare Worker that serves static files only.
+
+- Every push to `main` builds and deploys automatically (build command `npm run build`, deploy command `npx wrangler deploy`).
+- `wrangler.jsonc` tells Cloudflare to upload `./dist` as plain files. Keep it: without it, Wrangler auto-adds a server adapter and the deploy fails.
+- `.node-version` pins the Node version used for the build.
+- The site address used in link previews is set in `astro.config.mjs`. If you move to a custom domain, update it there or set a `SITE_URL` build variable.
 
 `public/_headers` already sends `noindex` and caching headers, and every page has a `noindex` meta tag, so search engines should not list the site. Anyone with the link can still open it.
 
