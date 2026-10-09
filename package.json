@@ -10,7 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "new-event": "node scripts/new-event.mjs"
+    "new-event": "node scripts/new-event.mjs",
+    "shrink-photos": "node scripts/shrink-photos.mjs"
   },
   "dependencies": {
     "@fontsource-variable/fredoka": "^5.3.0",
